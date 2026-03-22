@@ -1,7 +1,12 @@
 public class Value {
 
+    // Value type names
+    public static final String NUMBER = "NUMBER";
+    public static final String NAME = "NAME";
+    public static final String EMPTY_LIST = "EMPTY_LIST";
+    public static final String LIST = "LIST";
+
     // Stores what kind of value this is
-    // Example: NUMBER, NAME, EMPTY_LIST, or LIST
     private String type;
 
     // Stores the text value for simple types like NUMBER or NAME
@@ -49,17 +54,22 @@ public class Value {
 
     // Checks if this value is an empty list
     public boolean isEmptyList() {
-        return type.equals("EMPTY_LIST");
+        return type.equals(EMPTY_LIST);
+    }
+
+    // Checks if this value is a list node
+    public boolean isList() {
+        return type.equals(LIST);
     }
 
     @Override
     public String toString() {
-        if (type.equals("LIST")) {
+        if (type.equals(LIST)) {
             return "[" + head + " | " + tail + "]";
-        } else if (type.equals("EMPTY_LIST")) {
+        } else if (type.equals(EMPTY_LIST)) {
             return "[]";
         } else {
-            return "(" + type + ", " + value + ")";
+            return value;
         }
     }
 }

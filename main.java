@@ -1,10 +1,13 @@
 import java.util.ArrayList;
+import java.util.Scanner;
 
 public class Main {
     public static void main(String[] args) {
+        Scanner scanner = new Scanner(System.in);
 
-        // Example input string
-        String input = "i 5 fatci i 7 sumji 3 4 i 7 dunli 7";
+        // Read the full input string from the user
+        System.out.println("Enter the input string:");
+        String input = scanner.nextLine();
 
         // Step 1: turn the raw input into tokens
         ArrayList<Token> tokens = Tokenizer.tokenize(input);
@@ -24,5 +27,7 @@ public class Main {
         System.out.println("\nInterpreter Output:");
         Interpreter interpreter = new Interpreter();
         interpreter.execute(statements);
+
+        scanner.close();
     }
 }

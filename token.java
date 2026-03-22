@@ -1,28 +1,28 @@
-private class Token {
+public class Token {
 
-    // stores what kind of token it is and its value
+    // Stores what kind of token it is
     private String type;
 
-    // stores the text from the input that this token represents
+    // Stores the text from the input that this token represents
+    private String value;
 
-
-    // makes a new token object
+    // Makes a new token object
     public Token(String type, String value) {
         this.type = type;
         this.value = value;
     }
 
-    // gets the token type
+    // Gets the token type
     public String getType() {
         return type;
     }
 
-    // gets the token value
+    // Gets the token value
     public String getValue() {
         return value;
     }
 
-    // returns the token in a readable format 
+    // Returns the token in a readable format
     @Override
     public String toString() {
         return "(" + type + ", " + value + ")";
