@@ -2,30 +2,48 @@ import java.util.ArrayList;
 
 public class Statement {
 
-    // stores the predicate name
+    // Stores the predicate name
     private String predicate;
 
-    // stores the arguments for the statement
+    // Stores the parsed arguments for the statement
     private ArrayList<String> arguments;
 
-    // creates a new statement with a predicate and its arguments
+    // True if this statement is a cmavo definition
+    private boolean definition;
+
+    // Creates a normal statement
     public Statement(String predicate, ArrayList<String> arguments) {
         this.predicate = predicate;
-        this.argumenets = arguments;
+        this.arguments = arguments;
+        this.definition = false;
     }
 
-    // returns the predicate name 
+    // Creates a statement and lets us say if it is a definition
+    public Statement(String predicate, ArrayList<String> arguments, boolean definition) {
+        this.predicate = predicate;
+        this.arguments = arguments;
+        this.definition = definition;
+    }
+
+    // Returns the predicate name
     public String getPredicate() {
         return predicate;
     }
 
-    // returns the list of arguments
+    // Returns the list of arguments
     public ArrayList<String> getArguments() {
         return arguments;
     }
 
+    // Returns true if this statement is a definition
+    public boolean isDefinition() {
+        return definition;
+    }
+
     @Override
     public String toString() {
-        return "Predicate: " + predicate + ", Arguments: " + arguments;
-
+        return "Predicate: " + predicate
+                + ", Arguments: " + arguments
+                + ", Definition: " + definition;
+    }
 }

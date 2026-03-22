@@ -2,9 +2,9 @@ import java.util.ArrayList;
 
 public class Main {
     public static void main(String[] args) {
-        
+
         // Example input string
-        String input = "i fatci 5 i sumji 3 4 i dunli 7 7";
+        String input = "i 5 fatci i 7 sumji 3 4 i 7 dunli 7";
 
         // Step 1: turn the raw input into tokens
         ArrayList<Token> tokens = Tokenizer.tokenize(input);
@@ -22,6 +22,7 @@ public class Main {
 
         // Step 3: run the statements
         System.out.println("\nInterpreter Output:");
-        Interpreter.execute(statements);
+        Interpreter interpreter = new Interpreter();
+        interpreter.execute(statements);
     }
 }
