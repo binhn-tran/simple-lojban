@@ -6,7 +6,7 @@ public class Interpreter {
 
     // Stores ordinary facts:
     // predicate name -> list of argument lists
-    private HashMap<String, ArrayList<ArrayList<String>>> factDatabase;
+    private HashMap<String, ArrayList<ArrayList<Value>>> factDatabase;
 
     // Stores simple cmavo definitions:
     // defined predicate name -> predicate it maps to
@@ -31,7 +31,7 @@ public class Interpreter {
 
         // Final statement is the query
         Statement query = statements.get(statements.size() - 1);
-        HashMap<String, String> bindings = new HashMap<>();
+        HashMap<String, Value> bindings = new HashMap<>();
 
         boolean result = evaluateStatement(query, bindings);
 
@@ -40,13 +40,12 @@ public class Interpreter {
             return;
         }
 
-        // Print variable bindings if there are any
         if (bindings.isEmpty()) {
             System.out.println("Query succeeded.");
         } else {
             System.out.println("Query succeeded.");
             System.out.println("Variable values:");
-            for (Map.Entry<String, String> entry : bindings.entrySet()) {
+            for (Map.Entry<String, Value> entry : bindings.entrySet()) {
                 System.out.println(entry.getKey() + " = " + entry.getValue());
             }
         }
@@ -55,20 +54,17 @@ public class Interpreter {
     // Processes a statement before the final query
     private void processStatement(Statement statement) {
         String predicate = statement.getPredicate();
-        ArrayList<String> args = statement.getArguments();
+        ArrayList<Value> args = statement.getArguments();
 
-        // Handle cmavo definitions
         if (statement.isDefinition() || predicate.equals("cmavo")) {
             handleCmavoDefinition(args);
             return;
         }
 
-        // Built-in predicates used before the final query can be treated as facts
         if (!isBuiltIn(predicate)) {
             storeFact(predicate, args);
         } else {
-            // For simple built-in facts, only store if true
-            HashMap<String, String> tempBindings = new HashMap<>();
+            HashMap<String, Value> tempBindings = new HashMap<>();
             if (evaluateBuiltIn(predicate, args, tempBindings)) {
                 storeFact(predicate, args);
             }
@@ -76,17 +72,16 @@ public class Interpreter {
     }
 
     // Stores a fact
-    private void storeFact(String predicate, ArrayList<String> args) {
+    private void storeFact(String predicate, ArrayList<Value> args) {
         factDatabase.putIfAbsent(predicate, new ArrayList<>());
         factDatabase.get(predicate).add(new ArrayList<>(args));
     }
 
-    // Evaluates a single statement with variable bindings
-    private boolean evaluateStatement(Statement statement, HashMap<String, String> bindings) {
+    // Evaluates a single statement
+    private boolean evaluateStatement(Statement statement, HashMap<String, Value> bindings) {
         String predicate = statement.getPredicate();
-        ArrayList<String> args = statement.getArguments();
+        ArrayList<Value> args = statement.getArguments();
 
-        // Follow simple cmavo definitions if present
         if (definitionDatabase.containsKey(predicate)) {
             predicate = definitionDatabase.get(predicate);
         }
@@ -99,7 +94,7 @@ public class Interpreter {
     }
 
     // Evaluates built-in predicates
-    private boolean evaluateBuiltIn(String predicate, ArrayList<String> args, HashMap<String, String> bindings) {
+    private boolean evaluateBuiltIn(String predicate, ArrayList<Value> args, HashMap<String, Value> bindings) {
         if (predicate.equals("fatci")) {
             return handleFatci(args, bindings);
         } else if (predicate.equals("sumji")) {
@@ -131,75 +126,96 @@ public class Interpreter {
     }
 
     // A very simple variable test:
-    // names start and end with periods, numbers are digits,
-    // everything else is treated like a variable/pattern symbol
-    private boolean isVariable(String value) {
+    // NUMBER values are not variables
+    // list values are not variables
+    // NAME values without periods are treated like variables
+    private boolean isVariable(Value value) {
         if (value == null) {
             return false;
         }
 
-        if (value.matches("0|[1-9][0-9]*")) {
+        if (value.getType().equals(Value.NUMBER)) {
             return false;
         }
 
-        if (value.matches("\\.[a-z]+\\.")) {
+        if (value.getType().equals(Value.EMPTY_LIST) || value.getType().equals(Value.LIST)) {
             return false;
         }
 
-        if (value.equals("[]")) {
-            return false;
+        if (value.getType().equals(Value.NAME)) {
+            String text = value.getValue();
+            return text != null && !text.matches("\\.[a-z]+\\.");
         }
 
-        if (value.startsWith("[HEAD:")) {
-            return false;
-        }
-
-        return true;
+        return false;
     }
 
     // Binds a variable or checks equality with an existing binding
-    private boolean bindOrMatch(String variable, String value, HashMap<String, String> bindings) {
-        if (!bindings.containsKey(variable)) {
-            bindings.put(variable, value);
+    private boolean bindOrMatch(Value variable, Value value, HashMap<String, Value> bindings) {
+        String variableName = variable.getValue();
+
+        if (!bindings.containsKey(variableName)) {
+            bindings.put(variableName, value);
             return true;
         }
-        return bindings.get(variable).equals(value);
+
+        return sameValue(bindings.get(variableName), value);
     }
 
     // Resolves a value if it is already a bound variable
-    private String resolveValue(String value, HashMap<String, String> bindings) {
-        if (isVariable(value) && bindings.containsKey(value)) {
-            return bindings.get(value);
+    private Value resolveValue(Value value, HashMap<String, Value> bindings) {
+        if (isVariable(value) && bindings.containsKey(value.getValue())) {
+            return bindings.get(value.getValue());
         }
         return value;
     }
 
+    // Compares two values structurally
+    private boolean sameValue(Value left, Value right) {
+        if (left == null || right == null) {
+            return left == right;
+        }
+
+        if (!left.getType().equals(right.getType())) {
+            return false;
+        }
+
+        if (left.getType().equals(Value.LIST)) {
+            return sameValue(left.getHead(), right.getHead())
+                    && sameValue(left.getTail(), right.getTail());
+        }
+
+        if (left.getType().equals(Value.EMPTY_LIST)) {
+            return true;
+        }
+
+        return left.getValue().equals(right.getValue());
+    }
+
     // fatci succeeds if exactly one argument is given
-    // and can bind a variable to a placeholder fact value if needed
-    private boolean handleFatci(ArrayList<String> args, HashMap<String, String> bindings) {
+    private boolean handleFatci(ArrayList<Value> args, HashMap<String, Value> bindings) {
         if (args.size() != 1) {
             return false;
         }
 
-        String arg = args.get(0);
+        Value arg = resolveValue(args.get(0), bindings);
 
         if (isVariable(arg)) {
-            return bindOrMatch(arg, "true", bindings);
+            return bindOrMatch(arg, new Value(Value.NAME, "true"), bindings);
         }
 
         return true;
     }
 
     // sumji means first = second + third
-    // supports one variable among the arguments
-    private boolean handleSumji(ArrayList<String> args, HashMap<String, String> bindings) {
+    private boolean handleSumji(ArrayList<Value> args, HashMap<String, Value> bindings) {
         if (args.size() != 3) {
             return false;
         }
 
-        String a0 = resolveValue(args.get(0), bindings);
-        String a1 = resolveValue(args.get(1), bindings);
-        String a2 = resolveValue(args.get(2), bindings);
+        Value a0 = resolveValue(args.get(0), bindings);
+        Value a1 = resolveValue(args.get(1), bindings);
+        Value a2 = resolveValue(args.get(2), bindings);
 
         int variableCount = 0;
         if (isVariable(a0)) variableCount++;
@@ -212,21 +228,24 @@ public class Interpreter {
 
         try {
             if (!isVariable(a0) && !isVariable(a1) && !isVariable(a2)) {
-                return Integer.parseInt(a0) == Integer.parseInt(a1) + Integer.parseInt(a2);
+                int v0 = Integer.parseInt(a0.getValue());
+                int v1 = Integer.parseInt(a1.getValue());
+                int v2 = Integer.parseInt(a2.getValue());
+                return v0 == v1 + v2;
             }
 
             if (isVariable(a0)) {
-                int value = Integer.parseInt(a1) + Integer.parseInt(a2);
-                return bindOrMatch(a0, String.valueOf(value), bindings);
+                int value = Integer.parseInt(a1.getValue()) + Integer.parseInt(a2.getValue());
+                return bindOrMatch(a0, new Value(Value.NUMBER, String.valueOf(value)), bindings);
             }
 
             if (isVariable(a1)) {
-                int value = Integer.parseInt(a0) - Integer.parseInt(a2);
-                return bindOrMatch(a1, String.valueOf(value), bindings);
+                int value = Integer.parseInt(a0.getValue()) - Integer.parseInt(a2.getValue());
+                return bindOrMatch(a1, new Value(Value.NUMBER, String.valueOf(value)), bindings);
             }
 
-            int value = Integer.parseInt(a0) - Integer.parseInt(a1);
-            return bindOrMatch(a2, String.valueOf(value), bindings);
+            int value = Integer.parseInt(a0.getValue()) - Integer.parseInt(a1.getValue());
+            return bindOrMatch(a2, new Value(Value.NUMBER, String.valueOf(value)), bindings);
 
         } catch (NumberFormatException e) {
             return false;
@@ -234,15 +253,14 @@ public class Interpreter {
     }
 
     // vujni means first = second - third
-    // supports one variable among the arguments
-    private boolean handleVujni(ArrayList<String> args, HashMap<String, String> bindings) {
+    private boolean handleVujni(ArrayList<Value> args, HashMap<String, Value> bindings) {
         if (args.size() != 3) {
             return false;
         }
 
-        String a0 = resolveValue(args.get(0), bindings);
-        String a1 = resolveValue(args.get(1), bindings);
-        String a2 = resolveValue(args.get(2), bindings);
+        Value a0 = resolveValue(args.get(0), bindings);
+        Value a1 = resolveValue(args.get(1), bindings);
+        Value a2 = resolveValue(args.get(2), bindings);
 
         int variableCount = 0;
         if (isVariable(a0)) variableCount++;
@@ -255,21 +273,24 @@ public class Interpreter {
 
         try {
             if (!isVariable(a0) && !isVariable(a1) && !isVariable(a2)) {
-                return Integer.parseInt(a0) == Integer.parseInt(a1) - Integer.parseInt(a2);
+                int v0 = Integer.parseInt(a0.getValue());
+                int v1 = Integer.parseInt(a1.getValue());
+                int v2 = Integer.parseInt(a2.getValue());
+                return v0 == v1 - v2;
             }
 
             if (isVariable(a0)) {
-                int value = Integer.parseInt(a1) - Integer.parseInt(a2);
-                return bindOrMatch(a0, String.valueOf(value), bindings);
+                int value = Integer.parseInt(a1.getValue()) - Integer.parseInt(a2.getValue());
+                return bindOrMatch(a0, new Value(Value.NUMBER, String.valueOf(value)), bindings);
             }
 
             if (isVariable(a1)) {
-                int value = Integer.parseInt(a0) + Integer.parseInt(a2);
-                return bindOrMatch(a1, String.valueOf(value), bindings);
+                int value = Integer.parseInt(a0.getValue()) + Integer.parseInt(a2.getValue());
+                return bindOrMatch(a1, new Value(Value.NUMBER, String.valueOf(value)), bindings);
             }
 
-            int value = Integer.parseInt(a1) - Integer.parseInt(a0);
-            return bindOrMatch(a2, String.valueOf(value), bindings);
+            int value = Integer.parseInt(a1.getValue()) - Integer.parseInt(a0.getValue());
+            return bindOrMatch(a2, new Value(Value.NUMBER, String.valueOf(value)), bindings);
 
         } catch (NumberFormatException e) {
             return false;
@@ -277,13 +298,13 @@ public class Interpreter {
     }
 
     // dunli checks equality and can bind one variable
-    private boolean handleDunli(ArrayList<String> args, HashMap<String, String> bindings) {
+    private boolean handleDunli(ArrayList<Value> args, HashMap<String, Value> bindings) {
         if (args.size() != 2) {
             return false;
         }
 
-        String left = resolveValue(args.get(0), bindings);
-        String right = resolveValue(args.get(1), bindings);
+        Value left = resolveValue(args.get(0), bindings);
+        Value right = resolveValue(args.get(1), bindings);
 
         if (isVariable(left) && !isVariable(right)) {
             return bindOrMatch(left, right, bindings);
@@ -297,81 +318,81 @@ public class Interpreter {
             return bindOrMatch(left, right, bindings);
         }
 
-        return left.equals(right);
+        return sameValue(left, right);
     }
 
     // steni represents the empty list
-    private boolean handleSteni(ArrayList<String> args, HashMap<String, String> bindings) {
+    private boolean handleSteni(ArrayList<Value> args, HashMap<String, Value> bindings) {
         if (args.size() != 1) {
             return false;
         }
 
-        String arg = resolveValue(args.get(0), bindings);
+        Value arg = resolveValue(args.get(0), bindings);
+        Value empty = new Value(Value.EMPTY_LIST, (String) null);
 
         if (isVariable(arg)) {
-            return bindOrMatch(arg, "[]", bindings);
+            return bindOrMatch(arg, empty, bindings);
         }
 
-        return arg.equals("[]");
+        return sameValue(arg, empty);
     }
 
-    // steko represents a list node [HEAD:x,TAIL:y]
-    private boolean handleSteko(ArrayList<String> args, HashMap<String, String> bindings) {
+    // steko represents a list node
+    private boolean handleSteko(ArrayList<Value> args, HashMap<String, Value> bindings) {
         if (args.size() != 3) {
             return false;
         }
 
-        String whole = resolveValue(args.get(0), bindings);
-        String head = resolveValue(args.get(1), bindings);
-        String tail = resolveValue(args.get(2), bindings);
+        Value whole = resolveValue(args.get(0), bindings);
+        Value head = resolveValue(args.get(1), bindings);
+        Value tail = resolveValue(args.get(2), bindings);
 
-        String listValue = "[HEAD:" + head + ",TAIL:" + tail + "]";
+        Value listValue = new Value(Value.LIST, head, tail);
 
         if (isVariable(whole)) {
             return bindOrMatch(whole, listValue, bindings);
         }
 
-        return whole.equals(listValue);
+        return sameValue(whole, listValue);
     }
 
     // Very simple cmavo handling:
     // first argument = new predicate name
     // second argument = existing predicate name
-    private void handleCmavoDefinition(ArrayList<String> args) {
+    private void handleCmavoDefinition(ArrayList<Value> args) {
         if (args.size() >= 2) {
-            String newPredicate = args.get(0);
-            String existingPredicate = args.get(1);
+            String newPredicate = args.get(0).getValue();
+            String existingPredicate = args.get(1).getValue();
             definitionDatabase.put(newPredicate, existingPredicate);
         }
     }
 
-    // Checks whether a matching fact was stored earlier,
-    // allowing variable bindings in the query
-    private boolean checkStoredFact(String predicate, ArrayList<String> args, HashMap<String, String> bindings) {
+    // Checks whether a matching fact was stored earlier
+    private boolean checkStoredFact(String predicate, ArrayList<Value> args, HashMap<String, Value> bindings) {
         if (!factDatabase.containsKey(predicate)) {
             return false;
         }
 
-        ArrayList<ArrayList<String>> knownFacts = factDatabase.get(predicate);
+        ArrayList<ArrayList<Value>> knownFacts = factDatabase.get(predicate);
 
-        for (ArrayList<String> factArgs : knownFacts) {
+        for (ArrayList<Value> factArgs : knownFacts) {
             if (factArgs.size() != args.size()) {
                 continue;
             }
 
-            HashMap<String, String> tempBindings = new HashMap<>(bindings);
+            HashMap<String, Value> tempBindings = new HashMap<>(bindings);
             boolean match = true;
 
             for (int i = 0; i < args.size(); i++) {
-                String queryArg = resolveValue(args.get(i), tempBindings);
-                String factArg = factArgs.get(i);
+                Value queryArg = resolveValue(args.get(i), tempBindings);
+                Value factArg = factArgs.get(i);
 
                 if (isVariable(queryArg)) {
                     if (!bindOrMatch(queryArg, factArg, tempBindings)) {
                         match = false;
                         break;
                     }
-                } else if (!queryArg.equals(factArg)) {
+                } else if (!sameValue(queryArg, factArg)) {
                     match = false;
                     break;
                 }

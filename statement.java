@@ -6,20 +6,20 @@ public class Statement {
     private String predicate;
 
     // Stores the parsed arguments for the statement
-    private ArrayList<String> arguments;
+    private ArrayList<Value> arguments;
 
     // True if this statement is a cmavo definition
     private boolean definition;
 
     // Creates a normal statement
-    public Statement(String predicate, ArrayList<String> arguments) {
+    public Statement(String predicate, ArrayList<Value> arguments) {
         this.predicate = predicate;
         this.arguments = arguments;
         this.definition = false;
     }
 
     // Creates a statement and lets us say if it is a definition
-    public Statement(String predicate, ArrayList<String> arguments, boolean definition) {
+    public Statement(String predicate, ArrayList<Value> arguments, boolean definition) {
         this.predicate = predicate;
         this.arguments = arguments;
         this.definition = definition;
@@ -31,7 +31,7 @@ public class Statement {
     }
 
     // Returns the list of arguments
-    public ArrayList<String> getArguments() {
+    public ArrayList<Value> getArguments() {
         return arguments;
     }
 
