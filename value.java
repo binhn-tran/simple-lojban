@@ -13,11 +13,11 @@ public class value {
     private String value;
 
     // Used for list structures like steko
-    private Value head;
-    private Value tail;
+    private value head;
+    private value tail;
 
     // Constructor for simple values like numbers and names
-    public Value(String type, String value) {
+    public value(String type, String value) {
         this.type = type;
         this.value = value;
         this.head = null;
@@ -25,7 +25,7 @@ public class value {
     }
 
     // Constructor for list values
-    public Value(String type, Value head, Value tail) {
+    public value(String type, value head, value tail) {
         this.type = type;
         this.value = null;
         this.head = head;
@@ -43,12 +43,12 @@ public class value {
     }
 
     // Returns the head of a list
-    public Value getHead() {
+    public value getHead() {
         return head;
     }
 
     // Returns the tail of a list
-    public Value getTail() {
+    public value getTail() {
         return tail;
     }
 
