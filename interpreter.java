@@ -2,15 +2,26 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 
-public class Interpreter {
+public class interpreter {
 
     // Stores ordinary facts:
     // predicate name -> list of argument lists
     private HashMap<String, ArrayList<ArrayList<Value>>> factDatabase;
 
-    // Stores simple cmavo definitions:
-    // defined predicate name -> predicate it maps to
-    private HashMap<String, String> definitionDatabase;
+    // Stores cmavo definitions:
+    // defined predicate name -> definition object
+    private HashMap<String, CmavoDefinition> definitionDatabase;
+
+    // Helper class for cmavo definitions
+    private static class CmavoDefinition {
+        String targetPredicate;
+        ArrayList<String> parameterNames;
+
+        CmavoDefinition(String targetPredicate, ArrayList<String> parameterNames) {
+            this.targetPredicate = targetPredicate;
+            this.parameterNames = parameterNames;
+        }
+    }
 
     public Interpreter() {
         factDatabase = new HashMap<>();
@@ -61,13 +72,16 @@ public class Interpreter {
             return;
         }
 
-        if (!isBuiltIn(predicate)) {
+        // Store non-built-in facts directly
+        if (!isBuiltIn(predicate) && !definitionDatabase.containsKey(predicate)) {
             storeFact(predicate, args);
-        } else {
-            HashMap<String, Value> tempBindings = new HashMap<>();
-            if (evaluateBuiltIn(predicate, args, tempBindings)) {
-                storeFact(predicate, args);
-            }
+            return;
+        }
+
+        // For built-ins, only store if the statement is already true
+        HashMap<String, Value> tempBindings = new HashMap<>();
+        if (evaluateStatement(statement, tempBindings)) {
+            storeFact(predicate, args);
         }
     }
 
@@ -82,8 +96,9 @@ public class Interpreter {
         String predicate = statement.getPredicate();
         ArrayList<Value> args = statement.getArguments();
 
+        // Evaluate predicates defined with cmavo
         if (definitionDatabase.containsKey(predicate)) {
-            predicate = definitionDatabase.get(predicate);
+            return evaluateCmavoCall(predicate, args, bindings);
         }
 
         if (isBuiltIn(predicate)) {
@@ -91,6 +106,52 @@ public class Interpreter {
         }
 
         return checkStoredFact(predicate, args, bindings);
+    }
+
+    // Evaluates a predicate defined using cmavo
+    private boolean evaluateCmavoCall(String predicate, ArrayList<Value> args, HashMap<String, Value> bindings) {
+        CmavoDefinition definition = definitionDatabase.get(predicate);
+
+        if (definition == null) {
+            return false;
+        }
+
+        // Argument count must match the definition
+        if (args.size() != definition.parameterNames.size()) {
+            return false;
+        }
+
+        HashMap<String, Value> localBindings = new HashMap<>(bindings);
+
+        // Bind actual arguments to the cmavo parameter names
+        for (int i = 0; i < args.size(); i++) {
+            String parameterName = definition.parameterNames.get(i);
+            Value actualArgument = resolveValue(args.get(i), localBindings);
+            Value parameterValue = new Value(Value.NAME, parameterName);
+
+            if (!bindOrMatch(parameterValue, actualArgument, localBindings)) {
+                return false;
+            }
+        }
+
+        // Expand into a call to the target predicate using bound arguments
+        ArrayList<Value> targetArgs = new ArrayList<>();
+        for (String parameterName : definition.parameterNames) {
+            if (!localBindings.containsKey(parameterName)) {
+                return false;
+            }
+            targetArgs.add(localBindings.get(parameterName));
+        }
+
+        Statement expandedStatement = new Statement(definition.targetPredicate, targetArgs, false);
+        boolean result = evaluateStatement(expandedStatement, localBindings);
+
+        if (result) {
+            bindings.clear();
+            bindings.putAll(localBindings);
+        }
+
+        return result;
     }
 
     // Evaluates built-in predicates
@@ -125,29 +186,18 @@ public class Interpreter {
                 || predicate.equals("cmavo");
     }
 
-    // A very simple variable test:
-    // NUMBER values are not variables
-    // list values are not variables
     // NAME values without periods are treated like variables
     private boolean isVariable(Value value) {
         if (value == null) {
             return false;
         }
 
-        if (value.getType().equals(Value.NUMBER)) {
+        if (!value.getType().equals(Value.NAME)) {
             return false;
         }
 
-        if (value.getType().equals(Value.EMPTY_LIST) || value.getType().equals(Value.LIST)) {
-            return false;
-        }
-
-        if (value.getType().equals(Value.NAME)) {
-            String text = value.getValue();
-            return text != null && !text.matches("\\.[a-z]+\\.");
-        }
-
-        return false;
+        String text = value.getValue();
+        return text != null && !text.matches("\\.[a-z]+\\.");
     }
 
     // Binds a variable or checks equality with an existing binding
@@ -192,22 +242,18 @@ public class Interpreter {
         return left.getValue().equals(right.getValue());
     }
 
-    // fatci succeeds if exactly one argument is given
+    // fatci succeeds if exactly one non-variable argument is given
     private boolean handleFatci(ArrayList<Value> args, HashMap<String, Value> bindings) {
         if (args.size() != 1) {
             return false;
         }
 
         Value arg = resolveValue(args.get(0), bindings);
-
-        if (isVariable(arg)) {
-            return bindOrMatch(arg, new Value(Value.NAME, "true"), bindings);
-        }
-
-        return true;
+        return !isVariable(arg);
     }
 
     // sumji means first = second + third
+    // Supports at most one variable
     private boolean handleSumji(ArrayList<Value> args, HashMap<String, Value> bindings) {
         if (args.size() != 3) {
             return false;
@@ -253,6 +299,7 @@ public class Interpreter {
     }
 
     // vujni means first = second - third
+    // Supports at most one variable
     private boolean handleVujni(ArrayList<Value> args, HashMap<String, Value> bindings) {
         if (args.size() != 3) {
             return false;
@@ -356,15 +403,36 @@ public class Interpreter {
         return sameValue(whole, listValue);
     }
 
-    // Very simple cmavo handling:
+    // cmavo definition:
     // first argument = new predicate name
-    // second argument = existing predicate name
+    // middle arguments = parameter names
+    // last argument = target predicate name
     private void handleCmavoDefinition(ArrayList<Value> args) {
-        if (args.size() >= 2) {
-            String newPredicate = args.get(0).getValue();
-            String existingPredicate = args.get(1).getValue();
-            definitionDatabase.put(newPredicate, existingPredicate);
+        if (args.size() < 2) {
+            return;
         }
+
+        Value newPredicateValue = args.get(0);
+        Value targetPredicateValue = args.get(args.size() - 1);
+
+        if (newPredicateValue.getValue() == null || targetPredicateValue.getValue() == null) {
+            return;
+        }
+
+        String newPredicateName = newPredicateValue.getValue();
+        String targetPredicateName = targetPredicateValue.getValue();
+
+        ArrayList<String> parameterNames = new ArrayList<>();
+
+        for (int i = 1; i < args.size() - 1; i++) {
+            Value param = args.get(i);
+            if (param.getValue() != null) {
+                parameterNames.add(param.getValue());
+            }
+        }
+
+        definitionDatabase.put(newPredicateName,
+                new CmavoDefinition(targetPredicateName, parameterNames));
     }
 
     // Checks whether a matching fact was stored earlier

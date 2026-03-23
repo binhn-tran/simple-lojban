@@ -1,6 +1,6 @@
 import java.util.ArrayList;
 
-public class Parser {
+public class parser {
 
     // Takes a list of tokens and turns them into a list of statements
     public static ArrayList<Statement> parse(ArrayList<Token> tokens) {
@@ -57,21 +57,18 @@ public class Parser {
         ArrayList<Value> arguments = new ArrayList<>();
 
         // Parse the first argument
-        ParsedArgument firstParsed = parseArgument(tokens, 0);
-        if (firstParsed.nextIndex != predicateIndex) {
-            throw new IllegalArgumentException("Invalid first argument before predicate");
-        }
+        ParsedArgument firstParsed = parseArgument(tokens, 0, predicateIndex);
         arguments.add(firstParsed.value);
 
-        // Parse remaining arguments
+        // Parse remaining arguments after the predicate
         int index = predicateIndex + 1;
         while (index < tokens.size()) {
-            ParsedArgument parsed = parseArgument(tokens, index);
+            ParsedArgument parsed = parseArgument(tokens, index, tokens.size());
             arguments.add(parsed.value);
             index = parsed.nextIndex;
         }
 
-        // Handle se by swapping first two arguments
+        // Handle se by swapping the first two arguments
         boolean seBeforeFirst = startsWithSe(tokens, 0, predicateIndex);
         boolean seBeforeSecond = predicateIndex + 1 < tokens.size()
                 && tokens.get(predicateIndex + 1).getValue().equals("se");
@@ -95,14 +92,13 @@ public class Parser {
 
         ArrayList<Value> arguments = new ArrayList<>();
 
-        // Store everything except the word "cmavo" as parsed values
         for (int i = 0; i < tokens.size(); ) {
             if (i == cmavoIndex) {
                 i++;
                 continue;
             }
 
-            ParsedArgument parsed = parseArgument(tokens, i);
+            ParsedArgument parsed = parseArgument(tokens, i, tokens.size());
             arguments.add(parsed.value);
             i = parsed.nextIndex;
         }
@@ -148,14 +144,14 @@ public class Parser {
         return findPredicate(tokens, name) != -1;
     }
 
-    // Checks if the argument starts with se
+    // Checks if an argument starts with se
     private static boolean startsWithSe(ArrayList<Token> tokens, int start, int limit) {
         return start < limit && tokens.get(start).getValue().equals("se");
     }
 
-    // Parses one argument starting at index start
-    private static ParsedArgument parseArgument(ArrayList<Token> tokens, int start) {
-        if (start >= tokens.size()) {
+    // Parses one argument starting at index start and staying before limit
+    private static ParsedArgument parseArgument(ArrayList<Token> tokens, int start, int limit) {
+        if (start >= limit || start >= tokens.size()) {
             throw new IllegalArgumentException("Invalid argument start");
         }
 
@@ -163,19 +159,20 @@ public class Parser {
 
         // Handle se before an argument
         if (first.getValue().equals("se")) {
-            if (start + 1 >= tokens.size()) {
+            if (start + 1 >= limit) {
                 throw new IllegalArgumentException("Incomplete se expression");
             }
-            return parseArgument(tokens, start + 1);
+            return parseArgument(tokens, start + 1, limit);
         }
 
         // Handle lo expressions
         if (first.getValue().equals("lo")) {
-            if (start + 1 >= tokens.size()) {
+            if (start + 1 >= limit) {
                 throw new IllegalArgumentException("Incomplete lo expression");
             }
 
-            String next = tokens.get(start + 1).getValue();
+            Token second = tokens.get(start + 1);
+            String next = second.getValue();
 
             // lo steni -> empty list
             if (next.equals("steni")) {
@@ -184,33 +181,27 @@ public class Parser {
 
             // lo steko X Y -> list node
             if (next.equals("steko")) {
-                ParsedArgument headArg = parseArgument(tokens, start + 2);
-                ParsedArgument tailArg = parseArgument(tokens, headArg.nextIndex);
+                ParsedArgument headArg = parseArgument(tokens, start + 2, limit);
+                ParsedArgument tailArg = parseArgument(tokens, headArg.nextIndex, limit);
 
                 Value listValue = new Value(Value.LIST, headArg.value, tailArg.value);
                 return new ParsedArgument(listValue, tailArg.nextIndex);
             }
 
             // lo name or lo predicate-word reference
-            Token actual = tokens.get(start + 1);
-
-            if (actual.getType().equals("NAME")) {
-                return new ParsedArgument(new Value(Value.NAME, actual.getValue()), start + 2);
-            }
-
-            if (actual.getType().equals("PREDICATE")) {
-                return new ParsedArgument(new Value(Value.NAME, actual.getValue()), start + 2);
+            if (second.getType().equals("NAME") || second.getType().equals("PREDICATE")) {
+                return new ParsedArgument(new Value(Value.NAME, second.getValue()), start + 2);
             }
 
             throw new IllegalArgumentException("Invalid lo expression");
         }
 
-        // Normal number
+        // Number literal
         if (first.getType().equals("NUMBER")) {
             return new ParsedArgument(new Value(Value.NUMBER, first.getValue()), start + 1);
         }
 
-        // Normal name
+        // Name literal
         if (first.getType().equals("NAME")) {
             return new ParsedArgument(new Value(Value.NAME, first.getValue()), start + 1);
         }

@@ -1,6 +1,6 @@
 import java.util.ArrayList;
 
-public class Statement {
+public class statement {
 
     // Stores the predicate name
     private String predicate;

@@ -1,6 +1,6 @@
 import java.util.ArrayList;
 
-public class Tokenizer {
+public class tokenizer {
 
     // Consonants and vowels used for short words and predicate words
     private static final String CONSONANT = "[bcdfgjklmnprstvxz]";

@@ -1,4 +1,4 @@
-public class Value {
+public class value {
 
     // Value type names
     public static final String NUMBER = "NUMBER";

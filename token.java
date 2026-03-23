@@ -1,4 +1,4 @@
-public class Token {
+public class token {
 
     // Stores what kind of token it is
     private String type;
@@ -7,7 +7,7 @@ public class Token {
     private String value;
 
     // Makes a new token object
-    public Token(String type, String value) {
+    public token(String type, String value) {
         this.type = type;
         this.value = value;
     }
