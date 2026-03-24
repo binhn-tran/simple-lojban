@@ -12,15 +12,15 @@ The project is divided into several Java files, each with a specific role. `main
 
 ## How the Program Works
 
-The program works in three main stages. First, the tokenizer reads the input string and separates it into valid tokens such as statement markers, names, numbers, predicates, and special words. Next, the parser takes those tokens and groups them into complete statements in a structured form. Finally, the interpreter uses the earlier statements to build a database of facts and definitions, then evaluates the last statement as the final query. This design made the program easier to organize because each part has a clear job.
+The program works in three main stages. First, the tokenizer reads the input string and separates it into valid tokens such as statement markers, names, numbers, predicates, and special words. Next, the parser takes those tokens and groups them into complete statements in a structured form. Finally, the interpreter uses the earlier statements to build a database of facts and definitions, then evaluates the last statement as the final query. 
 
 ## Features
 
-The program reads one full input string, checks whether the input follows the required format, tokenizes the input into valid word types, parses the tokens into statements, stores facts and predicate definitions, and evaluates the final query. It can also return variable values when variables appear in the final statement. If the input is invalid, the program displays an error message instead of crashing.
+The program reads one full input string, checks whether the input follows the required format, tokenizes the input into valid word types, parses the tokens into statements, stores facts and predicate definitions, and evaluates the final query. It can also return variable values when variables appear in the final statement. If the input is invalid, the program displays an error message.
 
 ## Built-In Predicate Support
 
-The interpreter includes support for built-in predicates such as `fatci`, `sumji`, `vujni`, `dunli`, `steni`, and `steko`. It also supports predicate definitions using `cmavo`, which allows the program to handle both predefined logic and user-defined predicate behavior based on the assignment rules.
+The interpreter includes support for built-in predicates such as `fatci`, `sumji`, `vujni`, `dunli`, `steni`, and `steko`. It also supports predicate definitions using `cmavo`, which allows the program to handle both predefined logic and user-defined predicate behavior.
 
 ## How to Compile and Run
 
